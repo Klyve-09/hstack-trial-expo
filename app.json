@@ -13,7 +13,11 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#faf8f4"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "output": "single",
@@ -27,6 +31,14 @@
           "backgroundColor": "#faf8f4",
           "image": "./assets/icon.png",
           "imageWidth": 96
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Pocket Notes to attach photos from your library.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ]
     ],

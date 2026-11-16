@@ -5,6 +5,7 @@ export type Item = {
   title: string;
   body: string;
   createdAt: string;
+  photoUri?: string;
 };
 
 export const ITEMS_KEY = 'pocket-notes.items.v1';
@@ -14,7 +15,8 @@ function isItem(value: unknown): value is Item {
   const item = value as Record<string, unknown>;
   return typeof item.id === 'string' && typeof item.title === 'string' &&
     typeof item.body === 'string' && typeof item.createdAt === 'string' &&
-    Number.isFinite(Date.parse(item.createdAt));
+    Number.isFinite(Date.parse(item.createdAt)) &&
+    (item.photoUri === undefined || typeof item.photoUri === 'string');
 }
 
 export async function loadItems(): Promise<Item[]> {
@@ -39,4 +41,14 @@ export async function createItem(title: string, body: string): Promise<Item> {
   };
   await AsyncStorage.setItem(ITEMS_KEY, JSON.stringify([item, ...items]));
   return item;
+}
+
+export async function attachPhoto(id: string, photoUri: string): Promise<Item> {
+  const items = await loadItems();
+  const index = items.findIndex((item) => item.id === id);
+  if (index === -1) throw new Error('This note is no longer available.');
+  const updated = { ...items[index], photoUri };
+  items[index] = updated;
+  await AsyncStorage.setItem(ITEMS_KEY, JSON.stringify(items));
+  return updated;
 }
