@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Read-only: is the running instance ours, booted, and on the commit we are verifying?
+# Prints one line per check and exits non-zero if any check fails.
+set -uo pipefail
+source "$(dirname "$0")/env.sh"
+fail=0
+check() { if [ "$2" = ok ]; then echo "ok    $1"; else echo "FAIL  $1: $2"; fail=1; fi; }
+
+head_sha="$(pocket_head)"
+dirty="$(git -C "$POCKET_REPO" status --porcelain --untracked-files=no)"
+check "clone clean at $head_sha" "$([ -z "$dirty" ] && echo ok || echo "tracked files modified")"
+
+pid="$(cat "$POCKET_RUN_DIR/emulator.pid" 2>/dev/null || true)"
+if [ -n "$pid" ] && tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -q -- "-avd $POCKET_AVD -port $POCKET_PORT"; then
+  check "emulator pid $pid is ours ($POCKET_AVD on $POCKET_PORT)" ok
+else
+  check "emulator started by launch.sh" "no live pid in $POCKET_RUN_DIR/emulator.pid"
+fi
+
+state="$(adb_s get-state 2>/dev/null || true)"
+check "adb sees $POCKET_SERIAL" "$([ "$state" = device ] && echo ok || echo "state '${state:-missing}'")"
+boot="$(adb_s shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+check "boot completed" "$([ "$boot" = 1 ] && echo ok || echo "sys.boot_completed='$boot'")"
+
+installed="$(cat "$POCKET_RUN_DIR/installed-sha" 2>/dev/null || true)"
+check "installed APK built from HEAD" "$([ "$installed" = "$head_sha" ] && echo ok || echo "installed '${installed:-none}', HEAD $head_sha; rerun launch.sh")"
+adb_s shell pm path "$POCKET_PACKAGE" >/dev/null 2>&1 \
+  && check "package $POCKET_PACKAGE installed" ok || check "package $POCKET_PACKAGE installed" "missing"
+
+top="$(adb_s shell dumpsys activity activities 2>/dev/null | grep -m1 topResumedActivity | tr -d '\r')"
+echo "info  top activity: ${top:-unknown}"
+exit "$fail"
