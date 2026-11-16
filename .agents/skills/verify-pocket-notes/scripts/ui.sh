@@ -30,7 +30,7 @@ dump() {
 
 # Prints "x y" (screen coordinates) for the first node whose text or content-desc equals $2
 # in dump $1; with $4 = field, only text fields (EditText) match, so a field's visible label
-# above it is skipped. Optional $3 is `dumpsys window windows` output: when the app window is shown
+# above it is skipped. Exits 3 when no node matches; any other non-zero exit is an error. Optional $3 is `dumpsys window windows` output: when the app window is shown
 # centred inside a larger task (the automotive AVD does this), uiautomator bounds are relative
 # to the task while input needs the window's real frame, so shift by the difference.
 center() {
@@ -51,7 +51,7 @@ for node in nodes:
         l, t, r, b = box(node)
         print((l + r) // 2 + dx, (t + b) // 2 + dy)
         sys.exit(0)
-sys.exit(1)
+sys.exit(3)
 PY
 }
 
@@ -83,7 +83,9 @@ PY
     label="$2"; secs="${3:-5}"; end=$((SECONDS + secs))
     while :; do
       dump
-      center "$DUMP" "$label" >/dev/null || { echo "absent: $label"; exit 0; }
+      rc=0; center "$DUMP" "$label" >/dev/null || rc=$?
+      [ "$rc" = 3 ] && { echo "absent: $label"; exit 0; }
+      [ "$rc" = 0 ] || { echo "ui: could not read $DUMP" >&2; exit 1; }
       [ "$SECONDS" -lt "$end" ] || break
       sleep 1
     done
