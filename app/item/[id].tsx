@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text } from 'react-native';
 
@@ -24,6 +24,10 @@ export default function ItemScreen() {
     return () => { active = false; };
   }, [id, attempt]);
 
+  useEffect(() => {
+    if (!loading && !error && !item) router.dismissTo('/');
+  }, [loading, error, item]);
+
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
       {loading ? <ActivityIndicator accessibilityLabel="Loading note" /> : error ? <>
@@ -33,7 +37,7 @@ export default function ItemScreen() {
         <Text selectable style={styles.heading}>{item.title}</Text>
         <Text style={styles.muted}>{new Date(item.createdAt).toLocaleString()}</Text>
         <Text selectable style={styles.text}>{item.body || 'No additional details.'}</Text>
-      </> : <Text style={styles.text}>This note is not available on this device.</Text>}
+      </> : null}
     </ScrollView>
   );
 }
