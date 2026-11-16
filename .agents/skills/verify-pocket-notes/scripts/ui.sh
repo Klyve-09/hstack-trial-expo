@@ -8,7 +8,8 @@
 #   ui.sh wait <label> [secs]    wait until a node with that label is on screen (default 30 s)
 #   ui.sh absent <label>         exit 0 only if no node has that label right now
 #   ui.sh tap <label>            tap the centre of the first node with that label
-#   ui.sh type <label> <text>    tap the field with that label, then type the text
+#   ui.sh field <label>          tap the text field (EditText) with that label
+#   ui.sh type <label> <text>    tap the text field with that label, then type the text
 #   ui.sh back                   press the system back key
 #   ui.sh begin <journey>        open a new evidence directory for this journey
 #   ui.sh shot <step>            save <step>.png and <step>.xml into the evidence directory
@@ -28,13 +29,14 @@ dump() {
 }
 
 # Prints "x y" (screen coordinates) for the first node whose text or content-desc equals $2
-# in dump $1. Optional $3 is `dumpsys window windows` output: when the app window is shown
+# in dump $1; with $4 = field, only text fields (EditText) match, so a field's visible label
+# above it is skipped. Optional $3 is `dumpsys window windows` output: when the app window is shown
 # centred inside a larger task (the automotive AVD does this), uiautomator bounds are relative
 # to the task while input needs the window's real frame, so shift by the difference.
 center() {
-  python3 -I - "$1" "$2" "${3:-}" "$POCKET_PACKAGE" <<'PY'
+  python3 -I - "$1" "$2" "${3:-}" "$POCKET_PACKAGE" "${4:-any}" <<'PY'
 import re, sys, xml.etree.ElementTree as ET
-path, label, windows, package = sys.argv[1:5]
+path, label, windows, package, kind = sys.argv[1:6]
 nodes = list(ET.parse(path).iter('node'))
 box = lambda n: list(map(int, re.findall(r'-?\d+', n.get('bounds'))))
 dx = dy = 0
@@ -43,6 +45,8 @@ frame = re.search(re.escape(package) + r'/[^,]*, frame=\[(\d+),(\d+),\d+,\d+\]',
 if root is not None and frame:
     dx, dy = int(frame.group(1)) - box(root)[0], int(frame.group(2)) - box(root)[1]
 for node in nodes:
+    if kind == 'field' and node.get('class') != 'android.widget.EditText':
+        continue
     if label in (node.get('text'), node.get('content-desc')):
         l, t, r, b = box(node)
         print((l + r) // 2 + dx, (t + b) // 2 + dy)
@@ -77,13 +81,14 @@ PY
     dump
     if center "$DUMP" "$2" >/dev/null; then echo "ui: '$2' is on screen" >&2; exit 1; fi
     echo "absent: $2" ;;
-  tap)
+  tap|field)
     dump
     windows="$(adb_s shell dumpsys window windows)"
-    xy="$(center "$DUMP" "$2" "$windows")" || { echo "ui: no node labelled '$2' (last dump: $DUMP)" >&2; exit 1; }
+    kind=any; [ "$1" = field ] && kind=field
+    xy="$(center "$DUMP" "$2" "$windows" "$kind")" || { echo "ui: no node labelled '$2' (last dump: $DUMP)" >&2; exit 1; }
     adb_s shell input tap $xy ;;
   type)
-    "$0" tap "$2"; sleep 0.5
+    "$0" field "$2"; sleep 0.5
     # `input text` takes %s for a space; quote the rest for the device shell.
     encoded="$(python3 -I -c 'import shlex,sys; print(shlex.quote(sys.argv[1].replace(" ", "%s")))' "$3")"
     adb_s shell input text "$encoded" ;;
@@ -109,5 +114,5 @@ PY
     dump "$dir/$2.xml"
     echo "$dir/$2.png" ;;
   *)
-    sed -n '2,16p' "$0" >&2; exit 2 ;;
+    sed -n '2,17p' "$0" >&2; exit 2 ;;
 esac
