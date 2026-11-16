@@ -118,5 +118,5 @@ PY
     dump "$dir/$2.xml"
     echo "$dir/$2.png" ;;
   *)
-    sed -n '2,17p' "$0" >&2; exit 2 ;;
+    awk 'NR > 1 && /^#/ { print; next } NR > 1 { exit }' "$0" >&2; exit 2 ;;
 esac

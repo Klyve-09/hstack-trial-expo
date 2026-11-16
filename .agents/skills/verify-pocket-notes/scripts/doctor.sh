@@ -7,11 +7,11 @@ fail=0
 check() { if [ "$2" = ok ]; then echo "ok    $1"; else echo "FAIL  $1: $2"; fail=1; fi; }
 
 head_sha="$(pocket_head)"
-dirty="$(git -C "$POCKET_REPO" status --porcelain --untracked-files=no)"
-check "clone clean at $head_sha" "$([ -z "$dirty" ] && echo ok || echo "tracked files modified")"
+dirty="$(git -C "$POCKET_REPO" status --porcelain)"
+check "clone clean at $head_sha" "$([ -z "$dirty" ] && echo ok || echo "modified or untracked files")"
 
 pid="$(cat "$POCKET_RUN_DIR/emulator.pid" 2>/dev/null || true)"
-if [ -n "$pid" ] && tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -q -- "-avd $POCKET_AVD -port $POCKET_PORT"; then
+if pocket_owns_pid "$pid"; then
   check "emulator pid $pid is ours ($POCKET_AVD on $POCKET_PORT)" ok
 else
   check "emulator started by launch.sh" "no live pid in $POCKET_RUN_DIR/emulator.pid"
@@ -25,7 +25,7 @@ check "boot completed" "$([ "$boot" = 1 ] && echo ok || echo "sys.boot_completed
 tree="$(pocket_app_tree)"
 installed="$(cat "$POCKET_RUN_DIR/installed-tree" 2>/dev/null || true)"
 check "installed APK built from HEAD's app tree $tree" "$([ "$installed" = "$tree" ] && echo ok || echo "installed '${installed:-none}'; rerun launch.sh")"
-adb_s shell pm path "$POCKET_PACKAGE" >/dev/null 2>&1 \
+adb_s shell pm path --user current "$POCKET_PACKAGE" >/dev/null 2>&1 \
   && check "package $POCKET_PACKAGE installed" ok || check "package $POCKET_PACKAGE installed" "missing"
 
 top="$(adb_s shell dumpsys activity activities 2>/dev/null | grep -m1 topResumedActivity | tr -d '\r')"

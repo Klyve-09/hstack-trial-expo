@@ -1,6 +1,6 @@
 ---
 name: verify-pocket-notes
-description: Drive the Pocket Notes Expo app as a user on an Android emulator on a Linux Hand (adb + uiautomator, release APK) and capture screenshot evidence. Use to confirm a change works in the real Android app, or to produce Screen check captures; not for iOS or web.
+description: Drive the Pocket Notes Expo app as a user on an Android emulator on a Linux Hand and capture screenshot evidence. Use to confirm a change works in the real Android app, or to produce Screen check captures; not for iOS or web.
 ---
 
 # Verify Pocket Notes on Android
@@ -26,7 +26,7 @@ timeout 3600 ssh -n laptop-arch 'cd /home/hyh/hand/hstack-trial-expo && .agents/
 
 What it does, in order:
 
-1. It refuses if tracked files are modified.
+1. It refuses if the clone has modified or untracked files, because the build bundles the working tree.
 2. It builds only when the APK on disk was not built from `HEAD`'s app tree, which is the commit's tree without `.agents/` and `.claude/`, so edits to this skill alone do not force a rebuild. The build is `npm ci`, then `npx expo prebuild --platform android --clean --no-install`, then a restore of `app.json` and `package.json`, then `./gradlew assembleRelease --no-daemon`.
 3. It boots the AVD headless and creates the AVD first if it is missing.
 4. It waits for `sys.boot_completed`, installs the APK, and clears app data so every run starts with no notes.
@@ -79,12 +79,14 @@ Stable handles in this app:
 | List | `No notes yet. Write your first one.` | empty-state text |
 | List | `Open <title>` on each note card; `ui.sh tap '<title>'` also works, through the title text inside the card | card `content-desc` |
 | List | `Could not load your notes. Please try again.` / `Try again` | load error |
-| Compose (`/compose`) | `Capture a thought` | heading text |
+| Compose (`/compose`) | `New note` header, `Capture a thought` | heading text |
 | Compose | `Title`, `Body` | text fields' `content-desc`; a visible label with the same text sits above each field, so use `type` or `field`, which only match text fields |
 | Compose | `Save note` (`Saving…` while saving) | button text |
 | Compose | `Give your note a title.` | validation alert |
+| Compose | `Could not save your note. Your text is still here; please try again.` | save error alert |
 | Note (`/item/[id]`) | `Note` header, the note title, the body or `No additional details.` | text |
 | Note | `This note is not available on this device.` | missing note |
+| Note | `Could not load this note.` / `Try again` | load error |
 
 Feature recipes are in [features/README.md](features/README.md).
 
@@ -119,8 +121,9 @@ timeout 120 ssh -n laptop-arch 'cd /home/hyh/hand/hstack-trial-expo && .agents/s
 Cleanup stops only what launch started:
 
 - the recorded emulator pid, through `adb emu kill` and then that pid;
-- the clone's Gradle daemon;
-- the adb server, if launch had to start it and no other device is attached.
+- the adb server, if launch had to start it and no other device, in any state, is listed.
+
+Builds use `--no-daemon`, so no Gradle daemon is left to stop.
 
 It never kills by process name. It keeps the AVD, the evidence, and the `android/` build cache (gitignored), so the next launch skips the native build when `HEAD` is unchanged. Run cleanup after every failed attempt too.
 
@@ -130,14 +133,16 @@ To remove the generated native project as well, run `rm -rf android ~/hand/verif
 
 - `laptop-arch` has only one system image: `system-images;android-34;pleos_car_emulator;x86_64`, a 42dot Android Automotive image, not a phone. Consequences:
   - The display is 2560x1440 landscape at 160 dpi. Launch sets that when it creates the AVD; the 320x640 avdmanager default breaks the car launcher.
-  - The foreground user is user 10, not 0. Use `--user current` for `pm` commands; `ui.sh` already does.
+  - The foreground user is user 10, not 0. Use `--user current` for `pm` commands; `launch.sh` and `doctor.sh` already do.
   - The app opens in multi-window mode in the right-hand panel, beside the driving view. Because the app asks for portrait, the system centres its window inside the panel. uiautomator then reports bounds relative to the panel, about 420 px left of where the app really is, so a tap on raw dump bounds lands in the black bar. `ui.sh tap` and `field` add the offset between the app window's frame from `dumpsys window windows` and the dump's root node. If you tap by hand, do the same.
   - `uiautomator dump` sees only the focused window. A dump with none of the app's text means a car activity took focus. Run `ui.sh start` to bring the app back.
   - The car launcher, maps, and driving view sit behind the app. Back from the notes list leaves the app.
   - The system language is Korean, so system strings such as the header back button (`위로 이동`) are Korean. The app's own strings are English.
   - Phone-only behaviour (portrait lock, a phone soft keyboard) is not exercised.
 
-  For a phone run, install a phone image such as `system-images;android-34;google_apis;x86_64` with `sdkmanager`, then launch with `POCKET_AVD=<new name> POCKET_SYSIMG='system-images;android-34;google_apis;x86_64'`.
+  For a phone run, install a phone image such as `system-images;android-34;google_apis;x86_64` with `sdkmanager`, then launch with `POCKET_AVD=<new name> POCKET_SYSIMG='system-images;android-34;google_apis;x86_64'`. Launch then creates the AVD at 1080x2400, 420 dpi.
+
+  **Unverified:** the phone path has never been run. The steps the automotive run did that a phone run will not are the 2560x1440 car display, the multi-window offset correction (it should compute 0 on a phone), and the launcher-focus restarts. The steps a phone run adds and nobody has checked are the phone screen size, portrait lock, and a soft keyboard if `hw.keyboard` is turned off. Treat the first phone run as an exercise of this skill and fix what fails.
 - `expo prebuild` rewrites the tracked `app.json` (it adds `android.package`) and `package.json` (the `android` and `ios` scripts). Launch restores both, so the clone stays clean and `hstack:hand` sync's dirty check does not trip. If prebuild touches any other tracked file, launch stops.
 - The first Gradle build installs `ndk/` and `cmake/` into the Hand's Android SDK and downloads Gradle into `~/.gradle`.
 - `uiautomator dump` sometimes fails while the screen is animating. `ui.sh` retries five times.

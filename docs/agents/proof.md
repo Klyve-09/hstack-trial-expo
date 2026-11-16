@@ -43,6 +43,8 @@ Use a Node.js version supported by Expo SDK 58, with npm. Install dependencies w
 - `typecheck`: `package-lock.json`
 - `typecheck`: `package.json`
 - `typecheck`: `tsconfig.json`
+- Review-only: `.agents/**`
+- Review-only: `.claude/**`
 - Review-only: `.github/**`
 - Review-only: `.gitignore`
 - Review-only: `AGENTS.md`

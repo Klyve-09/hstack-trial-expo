@@ -29,5 +29,9 @@ pocket_head() { git -C "$POCKET_REPO" rev-parse HEAD; }
 pocket_app_tree() {
   git -C "$POCKET_REPO" ls-tree HEAD | grep -vP '\t\.(agents|claude)$' | git -C "$POCKET_REPO" hash-object --stdin
 }
+# True when pid $1 is the emulator for our AVD and port (the launcher or the qemu process it execs).
+pocket_owns_pid() {
+  [ -n "${1:-}" ] && tr '\0' ' ' <"/proc/$1/cmdline" 2>/dev/null | grep -q -- "-avd $POCKET_AVD -port $POCKET_PORT"
+}
 # Directory of the current evidence run, created by `ui.sh begin`.
 pocket_evidence_dir() { cat "$POCKET_RUN_DIR/evidence-dir" 2>/dev/null; }

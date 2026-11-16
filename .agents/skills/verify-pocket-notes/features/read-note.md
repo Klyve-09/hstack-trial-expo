@@ -19,11 +19,11 @@ Preconditions:
 
 - A note titled `Long read` exists, with a body of more than two lines (several sentences), and a note titled `Title only` exists with an empty body. Create both through compose as in [Create a note](./create-note.md).
 
-- **Open.** Run `ui.sh begin read-note`, `ui.sh tap 'Long read'`, and `ui.sh wait 'Note'`, then `ui.sh shot 01-long-read`. The full body is visible, not cut to two lines.
+- **Open.** Run `ui.sh begin read-note`, `ui.sh tap 'Long read'`, and `ui.sh wait '<the full body text>'`, then `ui.sh shot 01-long-read`. The full body is visible, not cut to two lines.
 - **Back.** Run `ui.sh back` and `ui.sh wait 'Your notes'`.
 - **Empty body.** Run `ui.sh tap 'Title only'`, `ui.sh wait 'No additional details.'`, and `ui.sh shot 02-title-only`.
 
 ## Gotchas
 
-- The header title is the literal `Note`, not the note's title.
+- The header title is the literal `Note`, not the note's title, and it shows while the note is still loading. Wait for the body text, not the header, before capturing.
 - The deep link `pocketnotes://item/<id>` is ticket expo#3 and is not part of this map until it ships.
