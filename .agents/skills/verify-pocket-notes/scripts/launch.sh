@@ -29,6 +29,7 @@ if [ ! -f "$POCKET_APK" ] || [ "$(cat "$POCKET_RUN_DIR/apk-tree" 2>/dev/null)" !
     case "$f" in app.json|package.json) git checkout -- "$f" ;;
       *) echo "launch: prebuild changed unexpected tracked file $f" >&2; exit 1 ;; esac
   done
+  trap - EXIT
   (cd android && ./gradlew assembleRelease --no-daemon --console=plain) >"$POCKET_RUN_DIR/gradle.log" 2>&1 \
     || { echo "launch: gradle failed, see $POCKET_RUN_DIR/gradle.log" >&2; tail -30 "$POCKET_RUN_DIR/gradle.log" >&2; exit 1; }
   echo "$APP_TREE" >"$POCKET_RUN_DIR/apk-tree"

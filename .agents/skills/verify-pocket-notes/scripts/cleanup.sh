@@ -18,7 +18,7 @@ fi
 
 # Any listed device in any state (device, offline, unauthorized) means someone else uses adb.
 if [ "$(cat "$POCKET_RUN_DIR/adb-started" 2>/dev/null)" = 1 ]; then
-  others="$("$ADB" devices | tail -n +2 | grep -v '^$' || true)"
+  others="$("$ADB" devices | tail -n +2 | grep -v -e '^$' -e "^$POCKET_SERIAL[[:space:]]" || true)"
   if [ -z "$others" ]; then "$ADB" kill-server && echo "cleanup: adb server stopped"
   else echo "cleanup: adb server left running for: $others"; fi
 fi
