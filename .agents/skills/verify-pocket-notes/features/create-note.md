@@ -25,7 +25,7 @@ Preconditions:
 - **Enter content.** Run `ui.sh type Title 'Buy oat milk'` (it is appended after the spaces) and `ui.sh type Body 'Two cartons for the week'`, then `ui.sh shot 03-filled`. Both fields show the typed text.
 - **Save.** Run `ui.sh tap 'Save note'` and `ui.sh wait 'Your notes'`, then `ui.sh shot 04-list-after-save`. The list shows a card with `Buy oat milk`, with the leading spaces trimmed, and the body preview, and `ui.sh absent 'No notes yet. Write your first one.'` passes.
 - **Persist.** Kill and relaunch: run `ui.sh stop`, `ui.sh start`, and `ui.sh wait 'Buy oat milk' 60`, then `ui.sh shot 05-after-relaunch`. The two printed app pids differ, and the note is still listed.
-- **Second view.** Run `ui.sh tap 'Buy oat milk'` and `ui.sh wait 'Two cartons for the week'`, then `ui.sh shot 06-detail`. The detail screen shows the title, the creation date and time, and the body.
+- **Second view.** Run `ui.sh tap 'Buy oat milk'`, `ui.sh wait 'Note'`, `ui.sh wait 'Two cartons for the week'`, and `ui.sh absent 'New note'`, then `ui.sh shot 06-detail`. The body also appears in the list card, so only the missing `New note` button shows the detail screen is in front. The detail screen shows the title, the creation date and time, and the body.
 
 ## Gotchas
 
