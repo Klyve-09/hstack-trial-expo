@@ -65,7 +65,7 @@ $H "$C/ui.sh tap 'New note'"              # tap by label
 $H "$C/ui.sh type Title 'Buy oat milk'"   # tap the text field labelled Title, then type
 $H "$C/ui.sh field Body"                  # only tap (focus) the text field labelled Body
 $H "$C/ui.sh wait 'Buy oat milk' 20"      # wait for a label to appear
-$H "$C/ui.sh absent 'No notes yet. Write your first one.'"
+$H "$C/ui.sh absent 'No notes yet. Write your first one.'"   # wait up to 5 s for a label to leave
 $H "$C/ui.sh back"                        # system back
 $H "$C/ui.sh stop"; $H "$C/ui.sh start"   # process death, then relaunch
 ```

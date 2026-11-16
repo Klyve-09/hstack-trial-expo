@@ -6,7 +6,7 @@
 #   ui.sh stop                   print the app pid, then force-stop it (process death; data stays)
 #   ui.sh nodes                  dump the screen and list labelled nodes with their bounds
 #   ui.sh wait <label> [secs]    wait until a node with that label is on screen (default 30 s)
-#   ui.sh absent <label>         exit 0 only if no node has that label right now
+#   ui.sh absent <label> [secs]  wait until no node has that label (default 5 s), else exit 1
 #   ui.sh tap <label>            tap the centre of the first node with that label
 #   ui.sh field <label>          tap the text field (EditText) with that label
 #   ui.sh type <label> <text>    tap the text field with that label, then type the text
@@ -80,9 +80,14 @@ PY
     done
     echo "ui: '$label' did not appear within ${secs}s (last dump: $DUMP)" >&2; exit 1 ;;
   absent)
-    dump
-    if center "$DUMP" "$2" >/dev/null; then echo "ui: '$2' is on screen" >&2; exit 1; fi
-    echo "absent: $2" ;;
+    label="$2"; secs="${3:-5}"; end=$((SECONDS + secs))
+    while :; do
+      dump
+      center "$DUMP" "$label" >/dev/null || { echo "absent: $label"; exit 0; }
+      [ "$SECONDS" -lt "$end" ] || break
+      sleep 1
+    done
+    echo "ui: '$label' is still on screen after ${secs}s (last dump: $DUMP)" >&2; exit 1 ;;
   tap|field)
     dump
     windows="$(adb_s shell dumpsys window windows)"
