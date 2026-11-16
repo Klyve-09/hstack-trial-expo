@@ -27,15 +27,25 @@ dump() {
   echo "ui: uiautomator dump failed" >&2; return 1
 }
 
-# Prints "x y" for the first node whose text or content-desc equals $2 in dump $1.
+# Prints "x y" (screen coordinates) for the first node whose text or content-desc equals $2
+# in dump $1. Optional $3 is `dumpsys window windows` output: when the app window is shown
+# centred inside a larger task (the automotive AVD does this), uiautomator bounds are relative
+# to the task while input needs the window's real frame, so shift by the difference.
 center() {
-  python3 -I - "$1" "$2" <<'PY'
+  python3 -I - "$1" "$2" "${3:-}" "$POCKET_PACKAGE" <<'PY'
 import re, sys, xml.etree.ElementTree as ET
-path, label = sys.argv[1], sys.argv[2]
-for node in ET.parse(path).iter('node'):
+path, label, windows, package = sys.argv[1:5]
+nodes = list(ET.parse(path).iter('node'))
+box = lambda n: list(map(int, re.findall(r'-?\d+', n.get('bounds'))))
+dx = dy = 0
+root = next((n for n in nodes if n.get('package') == package), None)
+frame = re.search(re.escape(package) + r'/[^,]*, frame=\[(\d+),(\d+),\d+,\d+\]', windows)
+if root is not None and frame:
+    dx, dy = int(frame.group(1)) - box(root)[0], int(frame.group(2)) - box(root)[1]
+for node in nodes:
     if label in (node.get('text'), node.get('content-desc')):
-        l, t, r, b = map(int, re.findall(r'-?\d+', node.get('bounds')))
-        print((l + r) // 2, (t + b) // 2)
+        l, t, r, b = box(node)
+        print((l + r) // 2 + dx, (t + b) // 2 + dy)
         sys.exit(0)
 sys.exit(1)
 PY
@@ -69,7 +79,8 @@ PY
     echo "absent: $2" ;;
   tap)
     dump
-    xy="$(center "$DUMP" "$2")" || { echo "ui: no node labelled '$2' (last dump: $DUMP)" >&2; exit 1; }
+    windows="$(adb_s shell dumpsys window windows)"
+    xy="$(center "$DUMP" "$2" "$windows")" || { echo "ui: no node labelled '$2' (last dump: $DUMP)" >&2; exit 1; }
     adb_s shell input tap $xy ;;
   type)
     "$0" tap "$2"; sleep 0.5

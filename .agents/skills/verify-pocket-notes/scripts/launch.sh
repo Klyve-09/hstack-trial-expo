@@ -65,6 +65,13 @@ qpid="$(pgrep -f "qemu-system.*-avd $POCKET_AVD -port $POCKET_PORT" | head -1 ||
 adb_s install -r "$POCKET_APK" >/dev/null
 adb_s shell pm clear --user current "$POCKET_PACKAGE" >/dev/null
 echo "$HEAD_SHA" >"$POCKET_RUN_DIR/installed-sha"
-"$UI" start
-"$UI" wait "Your notes" 90 >/dev/null
-echo "READY $HEAD_SHA $POCKET_SERIAL"
+# The automotive launcher raises its own activities for a while after boot and can cover the
+# app. Ready means the list is the focused window twice, 10 s apart.
+for _ in $(seq 1 12); do
+  "$UI" start
+  if "$UI" wait "Your notes" 10 >/dev/null 2>&1 && sleep 10 && "$UI" wait "Your notes" 3 >/dev/null 2>&1; then
+    echo "READY $HEAD_SHA $POCKET_SERIAL"; exit 0
+  fi
+done
+echo "launch: the notes list never stayed in front; run ui.sh nodes and check the top activity" >&2
+exit 1
