@@ -12,9 +12,10 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "launch: tracked files are modified; sync the clone first" >&2; git status --short >&2; exit 1
 fi
 HEAD_SHA="$(pocket_head)"
+APP_TREE="$(pocket_app_tree)"
 
-# 1. Build (skipped when the APK on disk was built from HEAD).
-if [ ! -f "$POCKET_APK" ] || [ "$(cat "$POCKET_RUN_DIR/apk-sha" 2>/dev/null)" != "$HEAD_SHA" ]; then
+# 1. Build (skipped when the APK on disk was built from the same app tree as HEAD).
+if [ ! -f "$POCKET_APK" ] || [ "$(cat "$POCKET_RUN_DIR/apk-tree" 2>/dev/null)" != "$APP_TREE" ]; then
   echo "launch: building release APK for $HEAD_SHA (first build takes several minutes)"
   npm ci --no-audit --no-fund >"$POCKET_RUN_DIR/npm.log" 2>&1
   npx expo prebuild --platform android --clean --no-install >"$POCKET_RUN_DIR/prebuild.log" 2>&1
@@ -27,7 +28,8 @@ if [ ! -f "$POCKET_APK" ] || [ "$(cat "$POCKET_RUN_DIR/apk-sha" 2>/dev/null)" !=
   done
   (cd android && ./gradlew assembleRelease --no-daemon --console=plain) >"$POCKET_RUN_DIR/gradle.log" 2>&1 \
     || { echo "launch: gradle failed, see $POCKET_RUN_DIR/gradle.log" >&2; tail -30 "$POCKET_RUN_DIR/gradle.log" >&2; exit 1; }
-  echo "$HEAD_SHA" >"$POCKET_RUN_DIR/apk-sha"
+  echo "$APP_TREE" >"$POCKET_RUN_DIR/apk-tree"
+  echo "$HEAD_SHA" >"$POCKET_RUN_DIR/apk-built-at"
 fi
 
 # 2. Emulator: reuse ours, refuse a foreign one on our port, otherwise boot.
@@ -64,7 +66,7 @@ qpid="$(pgrep -f "qemu-system.*-avd $POCKET_AVD -port $POCKET_PORT" | head -1 ||
 # 3. Install and start from an empty data dir.
 adb_s install -r "$POCKET_APK" >/dev/null
 adb_s shell pm clear --user current "$POCKET_PACKAGE" >/dev/null
-echo "$HEAD_SHA" >"$POCKET_RUN_DIR/installed-sha"
+echo "$APP_TREE" >"$POCKET_RUN_DIR/installed-tree"
 # The automotive launcher raises its own activities for a while after boot and can cover the
 # app. Ready means the list is the focused window twice, 10 s apart.
 for _ in $(seq 1 12); do

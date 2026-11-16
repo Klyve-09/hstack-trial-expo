@@ -22,8 +22,9 @@ check "adb sees $POCKET_SERIAL" "$([ "$state" = device ] && echo ok || echo "sta
 boot="$(adb_s shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
 check "boot completed" "$([ "$boot" = 1 ] && echo ok || echo "sys.boot_completed='$boot'")"
 
-installed="$(cat "$POCKET_RUN_DIR/installed-sha" 2>/dev/null || true)"
-check "installed APK built from HEAD" "$([ "$installed" = "$head_sha" ] && echo ok || echo "installed '${installed:-none}', HEAD $head_sha; rerun launch.sh")"
+tree="$(pocket_app_tree)"
+installed="$(cat "$POCKET_RUN_DIR/installed-tree" 2>/dev/null || true)"
+check "installed APK built from HEAD's app tree $tree" "$([ "$installed" = "$tree" ] && echo ok || echo "installed '${installed:-none}'; rerun launch.sh")"
 adb_s shell pm path "$POCKET_PACKAGE" >/dev/null 2>&1 \
   && check "package $POCKET_PACKAGE installed" ok || check "package $POCKET_PACKAGE installed" "missing"
 

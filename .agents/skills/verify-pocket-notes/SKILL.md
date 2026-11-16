@@ -27,12 +27,12 @@ timeout 3600 ssh -n laptop-arch 'cd /home/hyh/hand/hstack-trial-expo && .agents/
 What it does, in order:
 
 1. It refuses if tracked files are modified.
-2. It builds only when the APK on disk was not built from `HEAD`: `npm ci`, then `npx expo prebuild --platform android --clean --no-install`, then a restore of `app.json` and `package.json`, then `./gradlew assembleRelease --no-daemon`.
+2. It builds only when the APK on disk was not built from `HEAD`'s app tree, which is the commit's tree without `.agents/` and `.claude/`, so edits to this skill alone do not force a rebuild. The build is `npm ci`, then `npx expo prebuild --platform android --clean --no-install`, then a restore of `app.json` and `package.json`, then `./gradlew assembleRelease --no-daemon`.
 3. It boots the AVD headless and creates the AVD first if it is missing.
 4. It waits for `sys.boot_completed`, installs the APK, and clears app data so every run starts with no notes.
 5. It starts `com.anonymous.pocketnotes/.MainActivity`.
 
-Ready means the line `READY <sha> emulator-5584` is printed. Launch prints that line only after the `Your notes` heading appears in a uiautomator dump, which is the app being usable, not just booted.
+Ready means the line `READY <sha> emulator-5584` is printed. Launch prints that line only after the `Your notes` heading is in the focused window's uiautomator dump twice, 10 s apart. That is the app being usable, not just booted. The automotive launcher keeps raising its own activities for a while after boot, so launch restarts the app until the list stays in front.
 
 The first build takes about 10–20 minutes: Gradle downloads its distribution, the NDK, and CMake into the SDK. Later builds of a new commit take a few minutes. The build is a release APK with the JS bundle embedded, signed with the template's debug key. No Metro server runs, so there is no dev menu, LogBox, or bundler to keep alive.
 
@@ -49,20 +49,21 @@ The doctor is read-only. It checks that:
 - the clone is clean;
 - the recorded emulator pid is alive and is our AVD on our port;
 - adb sees the serial and boot is complete;
-- the installed APK was built from `HEAD`;
+- the installed APK was built from `HEAD`'s app tree;
 - the package is installed.
 
-It also prints the top activity. Every line must be `ok`. Run it first whenever anything looks off. A `FAIL installed APK built from HEAD` means rerun `launch.sh`.
+It also prints the top activity. Every line must be `ok`. Run it first whenever anything looks off. A `FAIL installed APK built from HEAD's app tree` means rerun `launch.sh`.
 
 ## Drive
 
-`ui.sh` finds nodes by the exact `text` or `content-desc` in a fresh `uiautomator dump`. It never uses hard-coded coordinates.
+`ui.sh` finds nodes by the exact `text` or `content-desc` in a fresh `uiautomator dump` of the focused window. It never uses hard-coded coordinates. The usage list is at the top of `ui.sh`.
 
 ```sh
 H='timeout 120 ssh -n laptop-arch'; C='cd /home/hyh/hand/hstack-trial-expo && .agents/skills/verify-pocket-notes/scripts'
 $H "$C/ui.sh nodes"                       # list labelled nodes and bounds on the current screen
 $H "$C/ui.sh tap 'New note'"              # tap by label
-$H "$C/ui.sh type Title 'Buy oat milk'"   # tap a field by label, then type
+$H "$C/ui.sh type Title 'Buy oat milk'"   # tap the text field labelled Title, then type
+$H "$C/ui.sh field Body"                  # only tap (focus) the text field labelled Body
 $H "$C/ui.sh wait 'Buy oat milk' 20"      # wait for a label to appear
 $H "$C/ui.sh absent 'No notes yet. Write your first one.'"
 $H "$C/ui.sh back"                        # system back
@@ -76,13 +77,13 @@ Stable handles in this app:
 | List (`/`) | `Your notes` | heading text |
 | List | `New note` | button text |
 | List | `No notes yet. Write your first one.` | empty-state text |
-| List | `Open <title>` | each note card's `content-desc` |
+| List | `Open <title>` on each note card; `ui.sh tap '<title>'` also works, through the title text inside the card | card `content-desc` |
 | List | `Could not load your notes. Please try again.` / `Try again` | load error |
 | Compose (`/compose`) | `Capture a thought` | heading text |
-| Compose | `Title`, `Body` | text fields' `content-desc` |
+| Compose | `Title`, `Body` | text fields' `content-desc`; a visible label with the same text sits above each field, so use `type` or `field`, which only match text fields |
 | Compose | `Save note` (`Saving…` while saving) | button text |
 | Compose | `Give your note a title.` | validation alert |
-| Note (`/item/[id]`) | the note title, the body or `No additional details.` | text |
+| Note (`/item/[id]`) | `Note` header, the note title, the body or `No additional details.` | text |
 | Note | `This note is not available on this device.` | missing note |
 
 Feature recipes are in [features/README.md](features/README.md).
@@ -95,7 +96,7 @@ $H "$C/ui.sh shot 01-empty-list"  # writes 01-empty-list.png and 01-empty-list.x
 ```
 
 - Evidence goes to `~/hand/verify-evidence/pocket-notes/<UTC time>-<short sha>-<journey>/` on the Hand. That is outside the clone, so it never dirties the sync, and cleanup never deletes it.
-- `meta.txt` in that folder records the commit, the commit the installed APK was built from, the AVD, and the device fingerprint. Captures from an APK built from another commit do not count.
+- `meta.txt` in that folder records the commit, its app tree, the app tree the installed APK was built from, the AVD, and the device fingerprint. Captures where the two app trees differ do not count.
 - Copy the folder to the VM before reporting: `scp -r laptop-arch:<dir> <vm dir>`.
 - For a PR, put only the captures behind a verdict on the disposable branch `evidence/<pr>` and link them, as `hstack:hand` says.
 - Standards:
@@ -123,14 +124,17 @@ Cleanup stops only what launch started:
 
 It never kills by process name. It keeps the AVD, the evidence, and the `android/` build cache (gitignored), so the next launch skips the native build when `HEAD` is unchanged. Run cleanup after every failed attempt too.
 
-To remove the generated native project as well, run `rm -rf android ~/hand/verify-run/pocket-notes/apk-sha` in the clone.
+To remove the generated native project as well, run `rm -rf android ~/hand/verify-run/pocket-notes/apk-tree` in the clone.
 
 ## Gotchas
 
 - `laptop-arch` has only one system image: `system-images;android-34;pleos_car_emulator;x86_64`, a 42dot Android Automotive image, not a phone. Consequences:
   - The display is 2560x1440 landscape at 160 dpi. Launch sets that when it creates the AVD; the 320x640 avdmanager default breaks the car launcher.
   - The foreground user is user 10, not 0. Use `--user current` for `pm` commands; `ui.sh` already does.
+  - The app opens in multi-window mode in the right-hand panel, beside the driving view. Because the app asks for portrait, the system centres its window inside the panel. uiautomator then reports bounds relative to the panel, about 420 px left of where the app really is, so a tap on raw dump bounds lands in the black bar. `ui.sh tap` and `field` add the offset between the app window's frame from `dumpsys window windows` and the dump's root node. If you tap by hand, do the same.
+  - `uiautomator dump` sees only the focused window. A dump with none of the app's text means a car activity took focus. Run `ui.sh start` to bring the app back.
   - The car launcher, maps, and driving view sit behind the app. Back from the notes list leaves the app.
+  - The system language is Korean, so system strings such as the header back button (`위로 이동`) are Korean. The app's own strings are English.
   - Phone-only behaviour (portrait lock, a phone soft keyboard) is not exercised.
 
   For a phone run, install a phone image such as `system-images;android-34;google_apis;x86_64` with `sdkmanager`, then launch with `POCKET_AVD=<new name> POCKET_SYSIMG='system-images;android-34;google_apis;x86_64'`.

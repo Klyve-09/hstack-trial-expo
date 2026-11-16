@@ -2,8 +2,8 @@
 # Drive Pocket Notes on the verification emulator through adb and uiautomator.
 # Labels match a node's exact `text` or `content-desc` from a fresh uiautomator dump.
 #
-#   ui.sh start                  start (or bring back) the app and wait for its activity
-#   ui.sh stop                   force-stop the app (process death; data stays)
+#   ui.sh start                  start (or bring back) the app, wait for its activity, print its pid
+#   ui.sh stop                   print the app pid, then force-stop it (process death; data stays)
 #   ui.sh nodes                  dump the screen and list labelled nodes with their bounds
 #   ui.sh wait <label> [secs]    wait until a node with that label is on screen (default 30 s)
 #   ui.sh absent <label>         exit 0 only if no node has that label right now
@@ -57,8 +57,10 @@ PY
 
 case "${1:-}" in
   start)
-    adb_s shell am start -W -n "$POCKET_ACTIVITY" >/dev/null ;;
+    adb_s shell am start -W -n "$POCKET_ACTIVITY" >/dev/null
+    echo "app pid: $(adb_s shell pidof "$POCKET_PACKAGE" | tr -d '\r')" ;;
   stop)
+    echo "stopping app pid: $(adb_s shell pidof "$POCKET_PACKAGE" | tr -d '\r')"
     adb_s shell am force-stop "$POCKET_PACKAGE" ;;
   nodes)
     dump
@@ -100,7 +102,9 @@ PY
     {
       echo "journey: $2"
       echo "commit: $(pocket_head)"
-      echo "installed_apk_commit: $(cat "$POCKET_RUN_DIR/installed-sha" 2>/dev/null || echo unknown)"
+      echo "app_tree: $(pocket_app_tree)"
+      echo "installed_apk_app_tree: $(cat "$POCKET_RUN_DIR/installed-tree" 2>/dev/null || echo unknown)"
+      echo "apk_built_at_commit: $(cat "$POCKET_RUN_DIR/apk-built-at" 2>/dev/null || echo unknown)"
       echo "avd: $POCKET_AVD"
       echo "serial: $POCKET_SERIAL"
       echo "fingerprint: $(adb_s shell getprop ro.build.fingerprint | tr -d '\r')"

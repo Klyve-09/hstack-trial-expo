@@ -24,5 +24,10 @@ AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 
 adb_s() { "$ADB" -s "$POCKET_SERIAL" "$@"; }
 pocket_head() { git -C "$POCKET_REPO" rev-parse HEAD; }
+# Hash of the committed tree minus this skill (.agents, .claude): edits to the skill alone
+# do not change the app, so they do not force a native rebuild.
+pocket_app_tree() {
+  git -C "$POCKET_REPO" ls-tree HEAD | grep -vP '\t\.(agents|claude)$' | git -C "$POCKET_REPO" hash-object --stdin
+}
 # Directory of the current evidence run, created by `ui.sh begin`.
 pocket_evidence_dir() { cat "$POCKET_RUN_DIR/evidence-dir" 2>/dev/null; }

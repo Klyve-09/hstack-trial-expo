@@ -21,7 +21,7 @@ if [ "$(cat "$POCKET_RUN_DIR/adb-started" 2>/dev/null)" = 1 ] && ! "$ADB" device
   "$ADB" kill-server && echo "cleanup: adb server stopped"
 fi
 
-rm -f "$POCKET_RUN_DIR/emulator.pid" "$POCKET_RUN_DIR/adb-started" "$POCKET_RUN_DIR/installed-sha" \
+rm -f "$POCKET_RUN_DIR/emulator.pid" "$POCKET_RUN_DIR/adb-started" "$POCKET_RUN_DIR/installed-tree" \
   "$POCKET_RUN_DIR/evidence-dir" "$POCKET_RUN_DIR/last-dump.xml"
 echo "cleanup: evidence kept under $POCKET_EVIDENCE_ROOT"
 ls -1 "$POCKET_EVIDENCE_ROOT" 2>/dev/null | tail -5
